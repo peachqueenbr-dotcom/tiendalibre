@@ -46,6 +46,10 @@ export default function ReactivationTab({ customers }: ReactivationTabProps) {
       let aValue = a[sortBy as keyof CustomerAnalytics];
       let bValue = b[sortBy as keyof CustomerAnalytics];
       
+      // Tratar valores undefined
+      if (aValue === undefined) aValue = 0;
+      if (bValue === undefined) bValue = 0;
+      
       if (typeof aValue === 'string') aValue = aValue.toLowerCase();
       if (typeof bValue === 'string') bValue = bValue.toLowerCase();
       
