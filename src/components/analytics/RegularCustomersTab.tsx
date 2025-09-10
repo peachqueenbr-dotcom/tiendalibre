@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { CustomerAnalytics } from '@/types';
-import { TrendingUp, Users, Gift, Target, Crown, Award, Search } from 'lucide-react';
+import { TrendingUp, Users, Gift, Target, Crown, Award, Search, Send } from 'lucide-react';
+import CampaignModal from '@/components/ui/CampaignModal';
 
 interface RegularCustomersTabProps {
   customers: CustomerAnalytics[];
@@ -15,6 +16,9 @@ export default function RegularCustomersTab({ customers }: RegularCustomersTabPr
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeView, setActiveView] = useState<'all' | 'almost-vip' | 'most-active'>('all');
+  const [selectedCustomersForCampaign, setSelectedCustomersForCampaign] = useState<CustomerAnalytics[]>([]);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   // Clientes regulares ordenados por potencial de upgrade
   const regularCustomers = customers
@@ -90,6 +94,58 @@ export default function RegularCustomersTab({ customers }: RegularCustomersTabPr
       case 'almost-vip': return 'Clientes com alto potencial para upgrade VIP';
       case 'most-active': return 'Clientes que compraram recentemente';
       default: return 'Todos os clientes regulares da base';
+    }
+  };
+
+  // Funções de campanha
+  const handleSelectCustomer = (customer: CustomerAnalytics) => {
+    if (!isSelectionMode) return;
+    
+    setSelectedCustomersForCampaign(prev => {
+      const isSelected = prev.some(c => c.id === customer.id);
+      if (isSelected) {
+        return prev.filter(c => c.id !== customer.id);
+      } else {
+        return [...prev, customer];
+      }
+    });
+  };
+
+  const handleStartCampaign = () => {
+    const customersWithWhatsApp = filteredCustomers.filter(c => c.whatsapp);
+    if (customersWithWhatsApp.length === 0) return;
+    
+    setIsSelectionMode(true);
+    setSelectedCustomersForCampaign([]);
+  };
+
+  const handleCampaignConfirm = () => {
+    if (selectedCustomersForCampaign.length > 0) {
+      setIsCampaignModalOpen(true);
+    }
+  };
+
+  const handleCancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedCustomersForCampaign([]);
+  };
+
+  const handleSelectAll = () => {
+    const customersWithWhatsApp = filteredCustomers.filter(c => c.whatsapp);
+    if (selectedCustomersForCampaign.length === customersWithWhatsApp.length) {
+      setSelectedCustomersForCampaign([]);
+    } else {
+      setSelectedCustomersForCampaign(customersWithWhatsApp);
+    }
+  };
+
+  const customersWithWhatsApp = filteredCustomers.filter(c => c.whatsapp);
+
+  const getCampaignType = () => {
+    switch (activeView) {
+      case 'almost-vip': return 'Upgrade para VIP - Clientes Próximos';
+      case 'most-active': return 'Engajamento - Clientes Ativos';
+      default: return 'Fidelização - Clientes Regulares';
     }
   };
 
@@ -172,19 +228,97 @@ export default function RegularCustomersTab({ customers }: RegularCustomersTabPr
 
         {/* Filtros */}
         <div className="p-6 bg-gray-50 border-b">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Buscar por nome ou email..."
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="text-sm text-gray-600 flex items-center">
-              {filteredCustomers.length} resultados
+          <div className="space-y-4">
+            {/* Botão de Campanha */}
+            {!isSelectionMode ? (
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleStartCampaign}
+                  disabled={customersWithWhatsApp.length === 0}
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                  📱 Campanha {activeView === 'almost-vip' ? 'VIP' : activeView === 'most-active' ? 'Ativação' : 'Regulares'}
+                  {customersWithWhatsApp.length > 0 && (
+                    <span className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
+                      {customersWithWhatsApp.length} com WhatsApp
+                    </span>
+                  )}
+                </button>
+                {customersWithWhatsApp.length === 0 && (
+                  <span className="text-sm text-gray-500">
+                    ⚠️ Nenhum cliente com WhatsApp disponível
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="text-lg font-semibold text-green-800">
+                      📱 Selecionar Clientes - {getCampaignType()}
+                    </h4>
+                    <p className="text-green-600 text-sm">
+                      Clique nos clientes abaixo para selecioná-los para a campanha
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-green-700 bg-green-100 px-3 py-1 rounded-full">
+                      {selectedCustomersForCampaign.length} selecionados
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={handleSelectAll}
+                      className="text-sm text-green-700 hover:text-green-800 flex items-center gap-1"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCustomersForCampaign.length === customersWithWhatsApp.length && customersWithWhatsApp.length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-green-300"
+                      />
+                      Selecionar todos com WhatsApp ({customersWithWhatsApp.length})
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleCancelSelection}
+                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleCampaignConfirm}
+                      disabled={selectedCustomersForCampaign.length === 0}
+                      className="px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      Criar Campanha ({selectedCustomersForCampaign.length})
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Busca */}
+            <div className="flex gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou email..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div className="text-sm text-gray-600 flex items-center">
+                {isSelectionMode ? '👆 Clique nos clientes para selecionar' : `${filteredCustomers.length} resultados`}
+              </div>
             </div>
           </div>
         </div>
@@ -199,13 +333,40 @@ export default function RegularCustomersTab({ customers }: RegularCustomersTabPr
           <div className="space-y-3">
             {paginatedCustomers.map((customer, index) => {
               const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index;
+              const isSelected = selectedCustomersForCampaign.some(c => c.id === customer.id);
+              const hasWhatsApp = !!customer.whatsapp;
               return (
-                <div key={customer.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div 
+                  key={customer.id} 
+                  onClick={() => handleSelectCustomer(customer)}
+                  className={`bg-white border border-gray-200 rounded-lg p-4 transition-all ${
+                    isSelectionMode ? (hasWhatsApp ? 'cursor-pointer hover:bg-green-50' : 'cursor-not-allowed opacity-50') : 'hover:shadow-md'
+                  } ${isSelected ? 'bg-green-50 ring-2 ring-green-200' : ''}`}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-full flex items-center justify-center font-bold">
-                        {globalIndex + 1}
-                      </div>
+                      {isSelectionMode ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleSelectCustomer(customer);
+                            }}
+                            disabled={!hasWhatsApp}
+                            className="rounded border-green-300 text-green-600 focus:ring-green-500"
+                          />
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                            {globalIndex + 1}
+                          </div>
+                          {!hasWhatsApp && <span className="text-gray-500 text-xs">Sem WhatsApp</span>}
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-full flex items-center justify-center font-bold">
+                          {globalIndex + 1}
+                        </div>
+                      )}
                       <div>
                         <h4 className="font-medium text-gray-900">{customer.name}</h4>
                         <p className="text-sm text-gray-500">{customer.email}</p>
@@ -344,6 +505,20 @@ export default function RegularCustomersTab({ customers }: RegularCustomersTabPr
           </div>
         </div>
       </div>
+
+      {/* Modal de Campanha */}
+      {isCampaignModalOpen && (
+        <CampaignModal
+          isOpen={isCampaignModalOpen}
+          onClose={() => {
+            setIsCampaignModalOpen(false);
+            setIsSelectionMode(false);
+            setSelectedCustomersForCampaign([]);
+          }}
+          selectedCustomers={selectedCustomersForCampaign}
+          campaignType={getCampaignType()}
+        />
+      )}
     </div>
   );
 }
